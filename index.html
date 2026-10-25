@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f5f9;
+            margin: 0;
+            padding: 30px 15px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px #00000015;
+        }
+        h1 {
+            text-align: center;
+            color: #263b59;
+        }
+        .summary {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        .summary div {
+            flex: 1;
+            padding: 15px 8px;
+            border-radius: 8px;
+            background: #edf3ff;
+            text-align: center;
+        }
+        .summary p {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 0;
+        }
+        input, select, button {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 12px;
+            margin: 7px 0;
+            border: 1px solid #ccd3df;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        button {
+            background: #3157c8;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2343a5;
+        }
+        li {
+            background: #f7f8fb;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            overflow-wrap: anywhere;
+        }
+        .delete {
+            width: auto;
+            padding: 6px 10px;
+            margin-left: 8px;
+            background: #c0392b;
+        }
+        @media (max-width: 420px) {
+            .summary { gap: 6px; }
+            .summary div { padding: 12px 4px; }
+            .summary p { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>Expense Tracker</h1>
+
+        <section class="summary">
+            <div>Income<p id="income">₹0.00</p></div>
+            <div>Expenses<p id="expenses">₹0.00</p></div>
+            <div>Balance<p id="balance">₹0.00</p></div>
+        </section>
+
+        <h2>Add Transaction</h2>
+        <form id="transactionForm">
+            <input id="description" type="text"
+                placeholder="Transaction name" required maxlength="100">
+
+            <input id="amount" type="number"
+                placeholder="Amount (₹)" min="0.01" step="0.01" required>
+
+            <select id="type">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+            </select>
+
+            <select id="category">
+                <option>Food</option>
+                <option>Travel</option>
+                <option>Education</option>
+                <option>Shopping</option>
+                <option>Salary</option>
+                <option>Other</option>
+            </select>
+
+            <button type="submit">Add Transaction</button>
+        </form>
+
+        <h2>Transaction History</h2>
+        <ul id="transactionList"></ul>
+    </main>
+
+    <script>
+        let transactions = [];
+
+        try {
+            const saved = JSON.parse(
+                localStorage.getItem("expenseTransactions") || "[]"
+            );
+            if (Array.isArray(saved)) {
+                transactions = saved.filter(t =>
+                    t &&
+                    typeof t.id === "string" &&
+                    typeof t.description === "string" &&
+                    typeof t.amount === "number" &&
+                    Number.isFinite(t.amount) &&
+                    t.amount > 0 &&
+                    (t.type === "income" || t.type === "expense") &&
+                    typeof t.category === "string"
+                );
+            }
+        } catch (error) {
+            transactions = [];
+        }
+
+        const form = document.getElementById("transactionForm");
+
+        function saveTransactions() {
+            try {
+                localStorage.setItem(
+                    "expenseTransactions",
+                    JSON.stringify(transactions)
+                );
+                return true;
+            } catch (error) {
+                alert("Could not save transactions in this browser.");
+                return false;
+            }
+        }
+
+        function renderTransactions() {
+            const list = document.getElementById("transactionList");
+            list.replaceChildren();
+
+            let income = 0;
+            let expenses = 0;
+
+            transactions.forEach(t => {
+                if (t.type === "income") income += t.amount;
+                else expenses += t.amount;
+
+                const item = document.createElement("li");
+                item.append(
+                    document.createTextNode(
+                        `${t.description} — ₹${t.amount.toFixed(2)} ` +
+                        `(${t.type}, ${t.category}) `
+                    )
+                );
+
+                const del = document.createElement("button");
+                del.type = "button";
+                del.className = "delete";
+                del.textContent = "Delete";
+                del.addEventListener("click", () => {
+                    transactions = transactions.filter(x => x.id !== t.id);
+                    saveTransactions();
+                    renderTransactions();
+                });
+
+                item.appendChild(del);
+                list.appendChild(item);
+            });
+
+            document.getElementById("income").textContent =
+                `₹${income.toFixed(2)}`;
+            document.getElementById("expenses").textContent =
+                `₹${expenses.toFixed(2)}`;
+            document.getElementById("balance").textContent =
+                `₹${(income - expenses).toFixed(2)}`;
+        }
+
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+
+            const description = document.getElementById("description")
+                .value.trim();
+            const amount = Number(document.getElementById("amount").value);
+            const type = document.getElementById("type").value;
+            const category = document.getElementById("category").value;
+
+            if (!description || !Number.isFinite(amount) || amount <= 0) {
+                alert("Enter a name and an amount greater than zero.");
+                return;
+            }
+
+            transactions.push({
+                id: crypto.randomUUID(),
+                description,
+                amount,
+                type,
+                category
+            });
+
+            if (!saveTransactions()) {
+                transactions.pop();
+                return;
+            }
+
+            form.reset();
+            renderTransactions();
+        });
+
+        renderTransactions();
+    </script>
+</body>
+</html>
